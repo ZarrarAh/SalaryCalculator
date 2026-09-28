@@ -1,9 +1,12 @@
 ﻿using SalaryCalculator.Models;
+using System.Numerics;
 
 namespace SalaryCalculator.Services
 {
 	public class PayCalculator
 	{
+
+
 		public (DateTime Start, DateTime End) GetShiftPeriod(Shift shift)
 		{
 			// Slår sammen dato og klokkeslett til DateTime
@@ -43,6 +46,52 @@ namespace SalaryCalculator.Services
 			// Trekk fra pausen
 			workedHours -= shift.BreakMinutes / 60m;
 			return workedHours;
+		}
+
+		public decimal GetEveningHours(Shift shift, PaySettings settings) 
+		{
+			var (start, end) = GetShiftPeriod(shift);
+			decimal total = 0;
+
+			// En vakt kan gå over to datoer, så vi sjekker startdagen og dagen etter
+			for (int i = 0; i < 2; i++)
+			{
+				DateOnly day = shift.Date.AddDays(i);
+
+				//Kveldsvinduet: fra EveningStart til midnatt samme dag
+				DateTime windowStart = day.ToDateTime(settings.EveningStart);
+				DateTime windowEnd = day.AddDays(1).ToDateTime(TimeOnly.MinValue);
+
+				total += GetOverlapHours(start, end, windowStart, windowEnd); 
+			}
+
+			return total;
+		}
+
+		public decimal GetWeekendHours(Shift shift)
+		{
+			var (start, end) = GetShiftPeriod(shift);
+			decimal total = 0;
+	
+			//En vakt kan gå over to datoer, så vi sjekker startdagen og dagen etter
+			for (int i = 0; i < 2; i++)
+			{
+				DateOnly day = shift.Date.AddDays(i);
+
+				// Hopp over dager som ikke er lørdag eller søndag
+				if (day.DayOfWeek != DayOfWeek.Saturday && day.DayOfWeek != DayOfWeek.Sunday)
+				{
+					continue;
+				}
+
+				// Helgevinduet: Hele døgnet, fra 00:00 til 00:00 neste dag
+				DateTime windowStart = day.ToDateTime(TimeOnly.MinValue);
+				DateTime windowEnd = day.AddDays(1).ToDateTime(TimeOnly.MinValue);
+
+				total += GetOverlapHours(start, end, windowStart, windowEnd);
+			}
+
+			return total;
 		}
 	}
 }
