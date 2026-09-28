@@ -128,5 +128,24 @@ namespace SalaryCalculator.Services
 
 			return (start, end);
 		}
+
+		public PeriodPay CalculatePeriodPay(List<Shift> shifts, PaySettings settings, DateOnly dateInPeriod)
+		{
+			var (start, end) = GetPayPeriod(dateInPeriod);
+			var result = new PeriodPay { Start = start, End = end };
+
+			foreach (var shift in shifts)
+			{
+				// Ta bare med vakter som starter innenfor perioden
+				if (shift.Date < start || shift.Date > end)
+				{
+					continue;
+				}
+
+				result.Shifts.Add(CalculateShiftPay(shift, settings));
+			}
+
+			return result;
+		}
 	}
 }
