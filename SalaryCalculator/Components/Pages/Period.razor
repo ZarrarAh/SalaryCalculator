@@ -1,0 +1,175 @@
+﻿@page "/period"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Globalization
+@using Microsoft.AspNetCore.Authorization
+@using SalaryCalculator.Models
+@using SalaryCalculator.Services
+@inject ShiftService ShiftService
+@inject PayCalculator PayCalculator
+
+<PageTitle>Vaktliste</PageTitle>
+
+<h1>Vaktliste</h1>
+
+<div class="period-nav">
+    <button class="btn btn-outline-primary" @onclick="PreviousPeriodAsync">&larr; Forrige</button>
+    <strong>@periodStart.ToString("d. MMM yyyy", norwegian) - @periodEnd.ToString("d. MMM yyyy", norwegian)</strong>
+    <button class="btn btn-outline-primary" @onclick="NextPeriodAsync">Neste &rarr;</button>
+</div>
+
+<table class="table period-table">
+    <thead>
+        <tr>
+            <th>Ukedag</th>
+            <th>Dato</th>
+            <th>Vakt</th>
+            <th>Fra</th>
+            <th>Til</th>
+            <th>Pause (min)</th>
+            <th>Timer</th>
+            <th>Rød dag</th>
+            <th>Anmerkning</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var day in days)
+        {
+            var shift = shifts.GetValueOrDefault(day);
+
+            <tr class="@(IsWeekend(day) ? "weekend" : "")">
+                <td>@day.ToString("dddd", norwegian)</td>
+                <td>@day.ToString("dd.MM")</td>
+                <td>
+                    <select value="@(shift?.ShiftType.ToString() ?? "")"
+                            @onchange="e => OnShiftTypeChangedAsync(day, e.Value?.ToString())">
+                        <option value="">-</option>
+                        <option value="FirstShift">1.vakt</option>
+                        <option value="MiddleShift">M.vakt</option>
+                        <option value="SecondShift">2.vakt</option>
+                        <option value="NightShift">N.vakt</option>
+                        <option value="Custom">Egen</option>
+                    </select>
+                </td>
+
+                @if (shift is not null)
+                {
+                    <td><input type="time" @bind="shift.StartTime" @bind:after="() => SaveAsync(shift)" /></td>
+                    <td><input type="time" @bind="shift.EndTime" @bind:after="() => SaveAsync(shift)" /></td>
+                    <td><input type="number" @bind="shift.BreakMinutes" @bind:after="() => SaveAsync(shift)" /></td>
+                    <td>@PayCalculator.GetWorkedHours(shift).ToString("0.##")</td>
+                    <td><input type="checkbox" @bind="shift.IsRedDay" @bind:after="() => SaveAsync(shift)" /></td>
+                    <td><input type="text" @bind="shift.Note" @bind:after="() => SaveAsync(shift)" /></td>
+                }
+                else
+                {
+                    <td></td><td></td><td></td><td></td><td></td><td></td>
+                }
+            </tr>
+        }
+    </tbody>
+    <tfoot>
+        <tr>
+            <td colspan="6"><strong>SUM</strong></td>
+            <td><strong>@periodPay.WorkedHours.ToString("0.##")</strong></td>
+            <td colspan="2"><strong>@periodPay.Total.ToString("N2", norwegian) kr</strong></td>
+        </tr>
+    </tfoot>
+</table>
+
+@code {
+    private readonly CultureInfo norwegian = new("nb-NO");
+
+    private DateOnly periodStart;
+    private DateOnly periodEnd;
+    private List<DateOnly> days = new();
+    private Dictionary<DateOnly, Shift> shifts = new();
+    private PeriodPay periodPay = new();
+
+    // Midlertidig: byttes ut med brukerens egne innstillinger i steg 6
+    private readonly PaySettings settings = new() { HourlyWage = 232.67m };
+
+    // Kjøres når siden åpnes
+    protected override async Task OnInitializedAsync()
+    {
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        (periodStart, periodEnd) = PayCalculator.GetPayPeriod(today);
+        await LoadAsync();
+    }
+
+    // Lager én rad per dag og henter vaktene fra databasen
+    private async Task LoadAsync()
+    {
+        days = new List<DateOnly>();
+        for (var day = periodStart; day <= periodEnd; day = day.AddDays(1))
+        {
+            days.Add(day);
+        }
+
+        var list = await ShiftService.GetShiftsAsync(periodStart, periodEnd);
+        shifts = list.ToDictionary(s => s.Date);
+        RecalculateTotals();
+    }
+
+    private async Task PreviousPeriodAsync()
+    {
+        // Dagen før periodestart ligger i forrige periode
+        (periodStart, periodEnd) = PayCalculator.GetPayPeriod(periodStart.AddDays(-1));
+        await LoadAsync();
+    }
+
+    private async Task NextPeriodAsync()
+    {
+        // Dagen etter periodeslutt ligger i neste periode
+        (periodStart, periodEnd) = PayCalculator.GetPayPeriod(periodEnd.AddDays(1));
+        await LoadAsync();
+    }
+
+    // Kjøres når du velger noe i nedtrekkslisten
+    private async Task OnShiftTypeChangedAsync(DateOnly day, string? value)
+    {
+        var shift = shifts.GetValueOrDefault(day);
+
+        if (string.IsNullOrEmpty(value))
+        {
+            // "-" valgt: slett vakten hvis den finnes
+            if (shift is not null)
+            {
+                await ShiftService.DeleteShiftAsync(shift.Id);
+                shifts.Remove(day);
+            }
+        }
+        else
+        {
+            var type = Enum.Parse<ShiftType>(value);
+            shift ??= new Shift { Date = day };
+            shift.ShiftType = type;
+
+            // Faste vakter får standardtider. "Egen" beholder tidene hvis vakten fantes fra før.
+            if (type != ShiftType.Custom || shift.Id == 0)
+            {
+                (shift.StartTime, shift.EndTime) = ShiftPresets.GetTimes(type);
+            }
+
+            await ShiftService.SaveShiftAsync(shift);
+            shifts[day] = shift;
+        }
+
+        RecalculateTotals();
+    }
+
+    // Kjøres når du endrer tid, pause, rød dag eller anmerkning
+    private async Task SaveAsync(Shift shift)
+    {
+        await ShiftService.SaveShiftAsync(shift);
+        RecalculateTotals();
+    }
+
+    private void RecalculateTotals()
+    {
+        periodPay = PayCalculator.CalculatePeriodPay(shifts.Values.ToList(), settings, periodStart);
+    }
+
+    private static bool IsWeekend(DateOnly day) =>
+        day.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
+}

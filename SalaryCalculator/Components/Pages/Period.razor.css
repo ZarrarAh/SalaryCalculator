@@ -1,0 +1,22 @@
+﻿.period-nav {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.period-table tbody td {
+    background-color: #ffffcc;
+}
+
+.period-table tbody tr.weekend td {
+    background-color: #d9d9d9;
+}
+
+.period-table input[type=time] {
+    width: 7rem;
+}
+
+.period-table input[type=number] {
+    width: 5rem;
+}
