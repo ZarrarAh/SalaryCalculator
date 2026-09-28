@@ -93,5 +93,40 @@ namespace SalaryCalculator.Services
 
 			return total;
 		}
+
+		public ShiftPay CalculateShiftPay(Shift shift, PaySettings settings)
+		{
+			// 1. Regn ut timene med metodene vi allerede har
+			var result = new ShiftPay
+			{
+				WorkedHours = GetWorkedHours(shift),
+				EveningHours = GetEveningHours(shift, settings),
+				WeekendHours = GetWeekendHours(shift)
+			};
+
+			// Rød dag: alle betalte timer gir tillegg
+			result.RedDayHours = shift.IsRedDay ? result.WorkedHours : 0;
+
+			// 2. Gang timene med satsene
+			result.BasePay = result.WorkedHours * settings.HourlyWage;
+			result.EveningPay = result.EveningHours * settings.EveningAllowance;
+			result.WeekendPay = result.WeekendHours * settings.WeekendAllowance;
+			result.RedDayPay = result.RedDayHours * settings.HourlyWage * settings.RedDayPercent / 100;
+
+			return result;
+		}
+
+		public (DateOnly Start, DateOnly End) GetPayPeriod(DateOnly date)
+		{
+			// Fra og med den 16. starter en ny periode
+			DateOnly start = date.Day >= 16
+				? new DateOnly(date.Year, date.Month, 16)
+				: new DateOnly(date.Year, date.Month, 16).AddMonths(-1);
+
+			// Slutten er dagen før den 16. neste måned, altså den 15.
+			DateOnly end = start.AddMonths(1).AddDays(-1);
+
+			return (start, end);
+		}
 	}
 }
