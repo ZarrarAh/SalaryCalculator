@@ -147,5 +147,6 @@ namespace SalaryCalculator.Services
 
 			return result;
 		}
+
 	}
 }
