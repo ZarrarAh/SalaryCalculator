@@ -1,0 +1,75 @@
+﻿@page "/settings"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@using SalaryCalculator.Models
+@using SalaryCalculator.Services
+@inject SettingsService SettingsService
+
+<PageTitle>Innstillinger</PageTitle>
+
+<h1>Innstillinger</h1>
+
+@if (settings is null)
+{
+    <p>Laster...</p>
+}
+else
+{
+    <div style="max-width: 400px">
+        <EditForm Model="settings" OnValidSubmit="SaveAsync" FormName="settings">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="mb-3">
+                <label class="form-label">Timelønn (kr)</label>
+                <InputNumber class="form-control" @bind-Value="settings.HourlyWage" />
+            </div>
+
+            <h5 class="mt-4">Kveldstillegg</h5>
+            <div class="mb-3">
+                <label class="form-label">Sats per time (kr)</label>
+                <InputNumber class="form-control" @bind-Value="settings.EveningAllowance" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Starter kl.</label>
+                <InputDate Type="InputDateType.Time" class="form-control" @bind-Value="settings.EveningStart" />
+            </div>
+
+            <h5 class="mt-4">Helgetillegg</h5>
+            <div class="mb-3">
+                <label class="form-label">Sats per time (kr)</label>
+                <InputNumber class="form-control" @bind-Value="settings.WeekendAllowance" />
+            </div>
+
+            <h5 class="mt-4">Rød dag</h5>
+            <div class="mb-3">
+                <label class="form-label">Tillegg i prosent av timelønn</label>
+                <InputNumber class="form-control" @bind-Value="settings.RedDayPercent" />
+            </div>
+
+            <button type="submit" class="btn btn-primary">Lagre</button>
+        </EditForm>
+
+        @if (saved)
+        {
+            <div class="alert alert-success mt-3">Innstillingene er lagret.</div>
+        }
+    </div>
+}
+
+@code {
+    private PaySettings? settings;
+    private bool saved;
+
+    protected override async Task OnInitializedAsync()
+    {
+        settings = await SettingsService.GetSettingsAsync();
+    }
+
+    private async Task SaveAsync()
+    {
+        await SettingsService.SaveSettingsAsync(settings!);
+        saved = true;
+    }
+}

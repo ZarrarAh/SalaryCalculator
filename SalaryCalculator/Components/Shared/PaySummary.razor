@@ -1,0 +1,66 @@
+﻿@using System.Globalization
+@using SalaryCalculator.Models
+
+<h4 class="mt-4">Lønnsoppsummering</h4>
+
+<table class="table" style="max-width: 700px">
+    <thead>
+        <tr>
+            <th>Tekst</th>
+            <th class="text-end">Timer</th>
+            <th class="text-end">Sats</th>
+            <th class="text-end">Beløp</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Timelønn</td>
+            <td class="text-end">@FormatHours(Pay.WorkedHours)</td>
+            <td class="text-end">@FormatMoney(Settings.HourlyWage)</td>
+            <td class="text-end">@FormatMoney(Pay.BasePay)</td>
+        </tr>
+        <tr>
+            <td>Kveldstillegg</td>
+            <td class="text-end">@FormatHours(Pay.EveningHours)</td>
+            <td class="text-end">@FormatMoney(Settings.EveningAllowance)</td>
+            <td class="text-end">@FormatMoney(Pay.EveningPay)</td>
+        </tr>
+        <tr>
+            <td>Helgetillegg</td>
+            <td class="text-end">@FormatHours(Pay.WeekendHours)</td>
+            <td class="text-end">@FormatMoney(Settings.WeekendAllowance)</td>
+            <td class="text-end">@FormatMoney(Pay.WeekendPay)</td>
+        </tr>
+
+        @* Vis bare helligdagstillegg hvis det finnes røde dager i perioden *@
+        @if (Pay.RedDayHours > 0)
+        {
+            <tr>
+                <td>Helligdagstillegg</td>
+                <td class="text-end">@FormatHours(Pay.RedDayHours)</td>
+                <td class="text-end">@FormatMoney(Settings.HourlyWage * Settings.RedDayPercent / 100)</td>
+                <td class="text-end">@FormatMoney(Pay.RedDayPay)</td>
+            </tr>
+        }
+    </tbody>
+    <tfoot>
+        <tr>
+            <td colspan="3"><strong>Brutto</strong></td>
+            <td class="text-end"><strong>@FormatMoney(Pay.Total) kr</strong></td>
+        </tr>
+    </tfoot>
+</table>
+
+@code {
+    // Data som sendes inn fra siden som bruker komponenten
+    [Parameter, EditorRequired]
+    public PeriodPay Pay { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public PaySettings Settings { get; set; } = default!;
+
+    private static readonly CultureInfo Norwegian = new("nb-NO");
+
+    private static string FormatHours(decimal hours) => hours.ToString("0.##", Norwegian);
+    private static string FormatMoney(decimal amount) => amount.ToString("N2", Norwegian);
+}

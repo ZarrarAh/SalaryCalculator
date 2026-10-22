@@ -7,6 +7,7 @@
 @using SalaryCalculator.Services
 @inject ShiftService ShiftService
 @inject PayCalculator PayCalculator
+@inject SettingsService SettingsService
 
 <PageTitle>Vaktliste</PageTitle>
 
@@ -77,6 +78,8 @@
     </tfoot>
 </table>
 
+<PaySummary Pay="periodPay" Settings="settings" />
+
 @code {
     private readonly CultureInfo norwegian = new("nb-NO");
 
@@ -87,11 +90,15 @@
     private PeriodPay periodPay = new();
 
     // Midlertidig: byttes ut med brukerens egne innstillinger i steg 6
-    private readonly PaySettings settings = new() { HourlyWage = 232.67m };
+    //private readonly PaySettings settings = new() { HourlyWage = 232.67m };
+
+    private PaySettings settings = new();
 
     // Kjøres når siden åpnes
     protected override async Task OnInitializedAsync()
     {
+        settings = await SettingsService.GetSettingsAsync();
+
         var today = DateOnly.FromDateTime(DateTime.Today);
         (periodStart, periodEnd) = PayCalculator.GetPayPeriod(today);
         await LoadAsync();
