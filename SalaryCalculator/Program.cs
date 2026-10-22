@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using SalaryCalculator.Components;
 using SalaryCalculator.Components.Account;
@@ -42,6 +43,20 @@ builder.Services.AddScoped<PayCalculator>();
 builder.Services.AddScoped<ShiftService>();
 
 var app = builder.Build();
+
+var dbPath = new SqliteConnectionStringBuilder(connectionString).DataSource;
+var dbFolder = Path.GetDirectoryName(Path.GetFullPath(dbPath));
+if (!string.IsNullOrEmpty(dbFolder))
+{
+	Directory.CreateDirectory(dbFolder);
+}
+
+// Kjør migrasjoner automatisk ved oppstart, så databasen og tabellene alltid finnes
+using (var scope = app.Services.CreateScope())
+{
+	var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+	db.Database.Migrate();
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
